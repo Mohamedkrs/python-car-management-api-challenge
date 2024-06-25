@@ -10,7 +10,9 @@ car_bp = Blueprint('cars', __name__)
 @car_bp.route('/', methods=['GET'])
 def get_all_cars():
     """Get all cars from the database."""
-    return CarController.get_all_cars()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    return CarController.get_all_cars(page, per_page)
 
 
 @car_bp.route('/<int:car_id>', methods=['GET'])

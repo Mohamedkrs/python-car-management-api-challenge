@@ -4,7 +4,7 @@ from flask import jsonify
 from flask_restful import fields, marshal_with
 from sqlalchemy.exc import SQLAlchemyError
 
-from car_manager.controllers.exceptions import NotFoundError
+from car_manager.controllers.exceptions import NotFoundError, DBError
 from car_manager.database.db import db
 from car_manager.models.car_model import CarModel
 from car_manager.schemas.car_schema import CarSchema
@@ -24,7 +24,7 @@ class CarController:
     """Controller class for handling car data."""
 
     @staticmethod
-    def get_car_or_404(car_id: int):
+    def get_car_from_db(car_id: int):
         """Get car by ID from database.
 
         :param car_id: ID of the car to fetch.
@@ -32,20 +32,23 @@ class CarController:
         :rtype: CarModel
         :raises NotFoundError: If car with ID is not found.
         """
-        car = CarModel.query.get(car_id)
+        try:
+            car = CarModel.query.get(car_id)
+        except SQLAlchemyError as e:
+            raise DBError(f"An error occurred while fetching car with id {car_id}: {str(e)}")
         if car is None:
             raise NotFoundError(f"Car with id {car_id} not found")
         return car
 
     @staticmethod
-    def get_all_cars():
+    def get_all_cars(page: int, per_page: int):
         """Get all cars from the database.
 
         :returns: A tuple containing the list of all cars and the HTTP status code.
         :rtype: list
         """
         try:
-            cars = CarModel.query.all()
+            cars = CarModel.query.paginate(page=page, per_page=per_page).items
             return marshal_with(car_fields)(lambda: cars)(), 200
         except SQLAlchemyError as e:
             return jsonify({"message": "An error occurred while fetching cars", "error": str(e)}), 500
@@ -59,7 +62,7 @@ class CarController:
         :rtype: tuple
         """
         try:
-            car = CarController.get_car_or_404(car_id)
+            car = CarController.get_car_from_db(car_id)
         except NotFoundError as e:
             return jsonify({"message": e.message}), 404
         except SQLAlchemyError as e:
@@ -101,7 +104,7 @@ class CarController:
         if errors:
             return jsonify(errors), 400
         try:
-            car = CarController.get_car_or_404(car_id)
+            car = CarController.get_car_from_db(car_id)
         except NotFoundError as e:
             return jsonify({"message": e.message}), 404
         except SQLAlchemyError as e:
@@ -123,7 +126,7 @@ class CarController:
         :rtype: tuple
         """
         try:
-            car = CarController.get_car_or_404(car_id)
+            car = CarController.get_car_from_db(car_id)
         except NotFoundError as e:
             return jsonify({"message": e.message}), 404
         try:
